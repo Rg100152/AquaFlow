@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AquaFlow | Smart Water Bill Management</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800;900&family=Inter:wght@300;400;500;600;700&family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --primary: #0096FF;
+      --secondary: #00D4FF;
+      --accent: #00FFA3;
+      --bg: #040B16;
+      --card-bg: #111827;
+      --glass-bg: rgba(17, 24, 39, 0.65);
+      --glass-border: rgba(0, 150, 255, 0.25);
+      --text: #FFFFFF;
+      --text-dim: #9CA3AF;
+      --success: #22C55E;
+      --warning: #F59E0B;
+      --danger: #EF4444;
+      --radius-xl: 28px;
+      --radius-lg: 20px;
+      --radius-md: 14px;
+      --transition: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      --font-head: 'Montserrat', sans-serif;
+      --font-body: 'Poppins', sans-serif;
+    }
+    * { margin:0; padding:0; box-sizing:border-box; }
+    html { scroll-behavior:smooth; font-size:16px; }
+    body {
+      font-family:var(--font-body);
+      background:var(--bg);
+      color:var(--text);
+      line-height:1.6;
+      overflow-x:hidden;
+      min-height:100vh;
+    }
+    ::-webkit-scrollbar { width:8px; }
+    ::-webkit-scrollbar-track { background:#0A1628; }
+    ::-webkit-scrollbar-thumb { background:var(--primary); border-radius:10px; }
+
+    /* Water wave background canvas */
+    #waveCanvas {
+      position:fixed; top:0; left:0; width:100%; height:100%;
+      z-index:0; pointer-events:none; opacity:0.15;
+    }
+    /* App layout */
+    .app { position:relative; z-index:1; }
+    .page { display:none; min-height:100vh; padding:20px 24px 40px; animation: fadeSlide 0.5s ease; }
+    .page.active { display:block; }
+    @keyframes fadeSlide {
+      from { opacity:0; transform:translateY(20px); }
+      to { opacity:1; transform:translateY(0); }
+    }
+    .container { max-width:1300px; margin:0 auto; }
+
+    /* Navbar */
+    .navbar {
+      position:sticky; top:0; z-index:1000;
+      background:rgba(4,11,22,0.8); backdrop-filter:blur(20px);
+      border-bottom:1px solid rgba(0,150,255,0.2); padding:0 24px;
+    }
+    .navbar-inner { max-width:1300px; margin:0 auto; display:flex; align-items:center; justify-content:space-between; height:70px; }
+    .nav-brand { font-family:var(--font-head); font-size:1.8rem; font-weight:800; background:linear-gradient(135deg, #0096FF, #00D4FF); -webkit-background-clip:text; -webkit-text-fill-color:transparent; cursor:pointer; display:flex; align-items:center; gap:8px; }
+    .nav-links { display:flex; list-style:none; gap:6px; align-items:center; }
+    .nav-links a { color:var(--text); text-decoration:none; font-weight:500; padding:8px 16px; border-radius:30px; transition:var(--transition); cursor:pointer; font-size:0.9rem; }
+    .nav-links a:hover, .nav-links a.active { background:rgba(0,150,255,0.2); box-shadow:0 0 12px rgba(0,150,255,0.3); }
+    .hamburger { display:none; flex-direction:column; gap:5px; background:none; border:none; cursor:pointer; }
+    .hamburger span { width:26px; height:3px; background:white; border-radius:3px; }
+
+    /* Buttons */
+    .btn { display:inline-flex; align-items:center; gap:8px; padding:12px 28px; border-radius:50px; font-weight:600; font-size:0.95rem; border:none; cursor:pointer; transition:all 0.3s; background:linear-gradient(135deg, #0096FF, #00D4FF); color:white; box-shadow:0 6px 20px rgba(0,150,255,0.4); }
+    .btn:hover { transform:translateY(-3px); box-shadow:0 12px 28px rgba(0,212,255,0.6); }
+    .btn-outline { background:transparent; border:2px solid var(--primary); box-shadow:none; }
+    .btn-accent { background:linear-gradient(135deg, #00FFA3, #0096FF); }
+
+    /* Glass card */
+    .glass-card { background:var(--glass-bg); backdrop-filter:blur(24px); border:1px solid var(--glass-border); border-radius:var(--radius-lg); box-shadow:0 8px 32px rgba(0,0,0,0.4); padding:28px; transition:var(--transition); }
+    .glass-card:hover { box-shadow:0 0 35px rgba(0,150,255,0.15); }
+
+    /* Billing panel */
+    .bill-highlight { font-size:2.5rem; font-weight:800; background:linear-gradient(to right, #00D4FF, #00FFA3); -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
+
+    /* Charts */
+    canvas.chart { width:100%; max-width:500px; height:250px; }
+
+    /* Multi-connection tabs */
+    .connection-tab { display:inline-flex; padding:10px 20px; background:rgba(0,150,255,0.1); border-radius:30px; margin:0 4px; cursor:pointer; transition:var(--transition); }
+    .connection-tab.active { background:var(--primary); color:white; }
+
+    /* Timeline for complaint */
+    .complaint-timeline { position:relative; padding-left:30px; }
+    .complaint-timeline::before { content:''; position:absolute; left:12px; top:0; bottom:0; width:3px; background:var(--primary); }
+    .complaint-step { position:relative; margin-bottom:24px; padding-left:20px; }
+    .complaint-step::before { content:''; position:absolute; left:-24px; top:4px; width:14px; height:14px; border-radius:50%; background:var(--primary); }
+
+    @media (max-width:768px) {
+      .hamburger { display:flex; }
+      .nav-links { position:fixed; top:0; right:-100%; width:260px; height:100vh; background:rgba(10,20,35,0.97); backdrop-filter:blur(30px); flex-direction:column; padding:80px 20px; transition:0.4s; z-index:999; }
+      .nav-links.open { right:0; }
+    }
+  </style>
+</head>
+<body>
+  <canvas id="waveCanvas"></canvas>
+  <div class="app">
+    <nav class="navbar">
+      <div class="navbar-inner">
+        <div class="nav-brand" onclick="navigateTo('home')">💧 AquaFlow</div>
+        <button class="hamburger" id="hamburger"><span></span><span></span><span></span></button>
+        <ul class="nav-links" id="navLinks">
+          <li><a onclick="navigateTo('home')" class="active" data-page="home">Home</a></li>
+          <li><a onclick="navigateTo('dashboard')" data-page="dashboard">Dashboard</a></li>
+          <li><a onclick="navigateTo('bill')" data-page="bill">Current Bill</a></li>
+          <li><a onclick="navigateTo('meter')" data-page="meter">Smart Meter</a></li>
+          <li><a onclick="navigateTo('history')" data-page="history">History</a></li>
+          <li><a onclick="navigateTo('payment')" data-page="payment">Pay</a></li>
+          <li><a onclick="navigateTo('complaints')" data-page="complaints">Complaints</a></li>
+          <li><a onclick="navigateTo('profile')" data-page="profile">Profile</a></li>
+        </ul>
+      </div>
+    </nav>
+
+    <!-- PAGE: HOME -->
+    <div class="page active" id="page-home">
+      <div class="container" style="text-align:center; padding-top:80px;">
+        <h1 style="font-family:var(--font-head); font-size:3.5rem; background:linear-gradient(to right, #00D4FF, #00FFA3); -webkit-background-clip:text; -webkit-text-fill-color:transparent;">Smart Water. Smart Living.</h1>
+        <p style="font-size:1.3rem; color:var(--text-dim); margin:20px 0;">Monitor, manage & pay your water bills effortlessly.</p>
+        <button class="btn btn-accent" onclick="navigateTo('dashboard')">💧 View Dashboard</button>
+        <div class="glass-card" style="margin-top:50px; display:flex; justify-content:space-around; flex-wrap:wrap;">
+          <div><span class="bill-highlight">15.2</span><p>m³ used today</p></div>
+          <div><span class="bill-highlight">₹ 1,245</span><p>Current Bill</p></div>
+          <div><span class="bill-highlight">98%</span><p>On-time Payments</p></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- PAGE: LOGIN (embedded) -->
+    <div class="page" id="page-login">
+      <div class="container glass-card" style="max-width:400px; margin:60px auto;">
+        <h2>🔐 Login</h2>
+        <div class="form-group"><input type="text" id="loginConsumer" placeholder="Consumer Number"></div>
+        <div class="form-group"><input type="password" id="loginPass" placeholder="Password"></div>
+        <button class="btn" style="width:100%;" onclick="handleLogin()">Login</button>
+        <p style="margin-top:12px;">New? <a onclick="navigateTo('register')" style="color:var(--accent);">Register</a></p>
+      </div>
+    </div>
+
+    <!-- PAGE: REGISTER -->
+    <div class="page" id="page-register">
+      <div class="container glass-card" style="max-width:600px; margin:40px auto;">
+        <h2>📝 Register</h2>
+        <div class="form-group"><input placeholder="Consumer Name" id="regName"></div>
+        <div class="form-group"><input placeholder="Consumer Number"></div>
+        <div class="form-group"><input placeholder="Mobile"></div>
+        <div class="form-group"><input type="email" placeholder="Email"></div>
+        <button class="btn" onclick="navigateTo('login')">Register</button>
+      </div>
+    </div>
+
+    <!-- PAGE: DASHBOARD -->
+    <div class="page" id="page-dashboard">
+      <div class="container">
+        <h2 style="font-family:var(--font-head);">📊 Dashboard</h2>
+        <div class="glass-card" style="display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:20px;">
+          <div onclick="navigateTo('bill')" class="glass-card" style="cursor:pointer;"><h3>Current Bill</h3><p class="bill-highlight">₹1,245</p></div>
+          <div class="glass-card"><h3>Consumption</h3><canvas id="dashChart" class="chart"></canvas></div>
+          <div class="glass-card"><h3>Meter Reading</h3><p>456.2 m³</p></div>
+          <div class="glass-card"><h3>Next Due</h3><p>15 July 2025</p></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- PAGE: CURRENT BILL -->
+    <div class="page" id="page-bill">
+      <div class="container glass-card" style="max-width:700px; margin:30px auto;">
+        <h2>🧾 Current Bill</h2>
+        <div class="grid-2col">
+          <div><strong>Consumer No:</strong> CON-883921</div>
+          <div><strong>Meter No:</strong> MET-44102</div>
+          <div><strong>Billing Month:</strong> June 2025</div>
+          <div><strong>Previous Reading:</strong> 430.0 m³</div>
+          <div><strong>Current Reading:</strong> 456.2 m³</div>
+          <div><strong>Units Consumed:</strong> 26.2 m³</div>
+          <div><strong>Water Charges:</strong> ₹ 655.00</div>
+          <div><strong>Sewer Charges:</strong> ₹ 150.00</div>
+          <div><strong>Maintenance:</strong> ₹ 200.00</div>
+          <div><strong>Late Fee:</strong> ₹ 0.00</div>
+          <div><strong>Discount:</strong> -₹ 50.00</div>
+          <div class="bill-highlight" style="font-size:2rem;">Total: ₹ 955.00</div>
+        </div>
+        <button class="btn btn-accent" onclick="navigateTo('payment')">💳 Pay Now</button>
+      </div>
+    </div>
+
+    <!-- PAGE: SMART METER -->
+    <div class="page" id="page-meter">
+      <div class="container glass-card" style="max-width:700px; margin:30px auto;">
+        <h2>📟 Smart Meter</h2>
+        <div class="meter-display" style="font-size:3rem; text-align:center;">456.2 m³</div>
+        <canvas id="meterChart" class="chart" style="margin:0 auto;"></canvas>
+        <p style="color:var(--warning);">⚠️ Leak Detection Alert: Possible continuous flow detected between 2-4 AM.</p>
+      </div>
+    </div>
+
+    <!-- PAGE: BILL HISTORY -->
+    <div class="page" id="page-history">
+      <div class="container">
+        <h2>📜 Bill History</h2>
+        <input placeholder="Search by month or amount" style="padding:12px; background:rgba(255,255,255,0.1); border:none; border-radius:20px; width:100%; color:white;">
+        <div class="glass-card" style="margin-top:20px;">
+          <table style="width:100%; border-collapse:collapse;">
+            <tr><th>Month</th><th>Amount</th><th>Status</th></tr>
+            <tr><td>May 2025</td><td>₹1,120</td><td class="text-success">Paid</td></tr>
+            <tr><td>Apr 2025</td><td>₹980</td><td class="text-success">Paid</td></tr>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- PAGE: PAYMENT -->
+    <div class="page" id="page-payment">
+      <div class="container glass-card" style="max-width:500px; margin:40px auto; text-align:center;">
+        <h2>💳 Payment</h2>
+        <p>Amount: ₹ <span id="payAmount">955</span></p>
+        <div class="payment-options">
+          <button class="btn" onclick="processPayment('UPI')">UPI</button>
+          <button class="btn" onclick="processPayment('Card')">Card</button>
+          <button class="btn" onclick="processPayment('NetBanking')">Net Banking</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- PAGE: RECEIPT -->
+    <div class="page" id="page-receipt">
+      <div class="container glass-card" style="max-width:500px; margin:40px auto; text-align:center;">
+        <h2>🧾 Digital Receipt</h2>
+        <p>Receipt No: RCPT-001234</p>
+        <p>Transaction ID: TXN987654</p>
+        <p>Amount: ₹955.00</p>
+        <div class="qr-placeholder" style="width:80px; height:80px; background:white; margin:10px auto;"></div>
+        <button class="btn" onclick="window.print()">🖨️ Print Receipt</button>
+      </div>
+    </div>
+
+    <!-- PAGE: COMPLAINTS -->
+    <div class="page" id="page-complaints">
+      <div class="container glass-card" style="max-width:600px; margin:30px auto;">
+        <h2>📢 Register Complaint</h2>
+        <select style="width:100%; padding:12px; background:#1A2538; color:white; border:none; border-radius:10px;">
+          <option>No Water Supply</option><option>Leakage</option><option>Wrong Bill</option><option>Meter Issue</option>
+        </select>
+        <textarea placeholder="Describe issue..." style="width:100%; margin-top:10px; background:#1A2538; color:white; border:none; border-radius:10px; padding:10px;"></textarea>
+        <button class="btn" onclick="alert('Complaint filed!')">Submit</button>
+        <div class="complaint-timeline" style="margin-top:20px;">
+          <div class="complaint-step"><strong>Filed</strong> - 12 Jun</div>
+          <div class="complaint-step"><strong>Assigned</strong> - 13 Jun</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- PAGE: ANALYTICS (embedded in dashboard) -->
+
+    <!-- PAGE: PROFILE -->
+    <div class="page" id="page-profile">
+      <div class="container glass-card" style="max-width:500px; margin:40px auto;">
+        <h2>👤 Profile</h2>
+        <p>Name: Jane Doe</p>
+        <p>Consumer No: CON-883921</p>
+        <button class="btn btn-sm">Update Profile</button>
+      </div>
+    </div>
+
+    <!-- PAGE: ABOUT (optional) -->
+  </div>
+
+  <script>
+    (function() {
+      // --- Water Wave Canvas Animation ---
+      const waveCanvas = document.getElementById('waveCanvas');
+      const wctx = waveCanvas.getContext('2d');
+      let width, height, waveOffset = 0;
+      function resizeWave() { width = waveCanvas.width = window.innerWidth; height = waveCanvas.height = window.innerHeight; }
+      window.addEventListener('resize', resizeWave); resizeWave();
+      function drawWave() {
+        wctx.clearRect(0,0,width,height);
+        wctx.fillStyle = 'rgba(0,150,255,0.03)';
+        wctx.beginPath();
+        wctx.moveTo(0, height*0.6);
+        for(let x=0; x<=width; x+=20) {
+          const y = height*0.6 + Math.sin(x*0.02 + waveOffset)*20 + Math.sin(x*0.01 + waveOffset*0.5)*10;
+          wctx.lineTo(x, y);
+        }
+        wctx.lineTo(width, height); wctx.lineTo(0, height); wctx.closePath(); wctx.fill();
+        waveOffset += 0.02; requestAnimationFrame(drawWave);
+      }
+      drawWave();
+
+      // --- Navigation ---
+      window.navigateTo = function(page) {
+        document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+        const target = document.getElementById('page-' + page);
+        if(target) target.classList.add('active');
+        document.querySelectorAll('.nav-links a[data-page]').forEach(a => a.classList.remove('active'));
+        const link = document.querySelector(`.nav-links a[data-page="${page}"]`);
+        if(link) link.classList.add('active');
+        document.getElementById('navLinks').classList.remove('open');
+        window.scrollTo(0,0);
+        if(page === 'dashboard') drawDashboardChart();
+        if(page === 'meter') drawMeterChart();
+      };
+
+      document.getElementById('hamburger').addEventListener('click', ()=> document.getElementById('navLinks').classList.toggle('open'));
+
+      // --- Login handler ---
+      window.handleLogin = function() {
+        const id = document.getElementById('loginConsumer').value;
+        if(id) { navigateTo('dashboard'); } else alert('Enter consumer number');
+      };
+
+      // --- Payment handler ---
+      window.processPayment = function(method) {
+        alert(`Payment via ${method} successful!`);
+        navigateTo('receipt');
+      };
+
+      // --- Chart drawing (Canvas) ---
+      function drawDashboardChart() {
+        const canvas = document.getElementById('dashChart');
+        if(!canvas) return;
+        const ctx = canvas.getContext('2d');
+        canvas.width = canvas.offsetWidth; canvas.height = 200;
+        const data = [120, 150, 130, 170, 160, 180, 140];
+        ctx.strokeStyle = '#00D4FF'; ctx.lineWidth=2;
+        ctx.beginPath();
+        data.forEach((val,i)=> {
+          const x = (i/(data.length-1))*canvas.width;
+          const y = canvas.height - (val/200)*canvas.height;
+          if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+        });
+        ctx.stroke();
+      }
+
+      function drawMeterChart() {
+        const canvas = document.getElementById('meterChart');
+        if(!canvas) return;
+        const ctx = canvas.getContext('2d');
+        canvas.width = canvas.offsetWidth; canvas.height = 200;
+        const data = [23,24,26,25,27,26.2];
+        ctx.strokeStyle = '#00FFA3'; ctx.lineWidth=2;
+        ctx.beginPath();
+        data.forEach((val,i)=> {
+          const x = (i/(data.length-1))*canvas.width;
+          const y = canvas.height - (val/30)*canvas.height;
+          if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+        });
+        ctx.stroke();
+      }
+
+      // Initial draw if dashboard active
+      if(document.getElementById('page-dashboard').classList.contains('active')) drawDashboardChart();
+    })();
+  </script>
+</body>
+</html>
